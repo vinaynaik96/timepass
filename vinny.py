@@ -31,13 +31,17 @@ class ConversationalSentimentAnalyzer:
 
         except Exception as e:
             print("Error analyzing sentiment:", e)
-            return None, None
+            return None, {}
 
 # Example usage
 conversation = "User: How are you?\nBot: I'm doing great! How about you?\nUser: I'm feeling happy today."
 analyzer = ConversationalSentimentAnalyzer("roberta-base")
 sentiment, word_sentiment_scores = analyzer.analyze_sentiment(conversation)
-print("Sentiment:", sentiment)
-print("Word-level sentiment scores:")
-for token, score in word_sentiment_scores.items():
-    print(token, ":", score)
+
+if sentiment is not None:
+    print("Sentiment:", sentiment)
+
+if word_sentiment_scores:
+    print("Word-level sentiment scores:")
+    for token, score in word_sentiment_scores.items():
+        print(token, ":", score)
