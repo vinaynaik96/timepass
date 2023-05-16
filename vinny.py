@@ -16,12 +16,24 @@ conversation = [
 # Analyze sentiment for each message in the conversation
 sentiments = []
 for message in conversation:
-    # Extract the text from the message (excluding the speaker prefix)
-    text = message.split(":")[1].strip()
+    # Extract the speaker and text from the message
+    speaker, text = message.split(":")
+    text = text.strip()
+    
+    # Determine the sentiment label for the message
     sentiment = get_sentiment(text)
-    sentiments.append(sentiment)
+    
+    # Assign sentiment label to the message
+    labeled_message = f"{speaker}: {text} ({sentiment})"
+    sentiments.append(labeled_message)
+
+# Print the sentiment labels for each message
+for message in sentiments:
+    print(message)
 
 # Determine the overall sentiment of the conversation
-overall_sentiment = max(set(sentiments), key=sentiments.count)
+positive_count = sum(1 for message in sentiments if 'Positive' in message)
+negative_count = sum(1 for message in sentiments if 'Negative' in message)
+overall_sentiment = 'Positive' if positive_count > negative_count else 'Negative'
 
 print("Overall sentiment:", overall_sentiment)
