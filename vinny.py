@@ -1,5 +1,4 @@
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-import torch
 
 class ConversationalSentimentAnalyzer:
     def __init__(self, model_name):
@@ -9,7 +8,6 @@ class ConversationalSentimentAnalyzer:
 
     def analyze_sentiment(self, conversation):
         try:
-            # Tokenize the conversation
             inputs = self.tokenizer.encode_plus(
                 conversation,
                 add_special_tokens=True,
@@ -19,20 +17,27 @@ class ConversationalSentimentAnalyzer:
             )
             inputs = inputs.to(self.device)
 
-            # Perform sentiment analysis
             with torch.no_grad():
                 logits = self.model(**inputs).logits
                 predicted_labels = torch.argmax(logits, dim=1)
                 sentiment_label = "Positive" if predicted_labels.item() == 1 else "Negative"
-            
-            return sentiment_label
+
+            # Get word-level sentiment scores
+            tokens = self.tokenizer.tokenize(conversation)
+            scores = torch.nn.functional.softmax(logits, dim=1).squeeze().tolist()
+            word_sentiment_scores = {token: score for token, score in zip(tokens, scores)}
+
+            return sentiment_label, word_sentiment_scores
 
         except Exception as e:
             print("Error analyzing sentiment:", e)
-            return None
+            return None, None
 
 # Example usage
 conversation = "User: How are you?\nBot: I'm doing great! How about you?\nUser: I'm feeling happy today."
-analyzer = ConversationalSentimentAnalyzer("bert-base-uncased")
-sentiment = analyzer.analyze_sentiment(conversation)
+analyzer = ConversationalSentimentAnalyzer("roberta-base")
+sentiment, word_sentiment_scores = analyzer.analyze_sentiment(conversation)
 print("Sentiment:", sentiment)
+print("Word-level sentiment scores:")
+for token, score in word_sentiment_scores.items():
+    print(token, ":", score)
