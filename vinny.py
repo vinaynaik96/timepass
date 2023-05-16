@@ -51,12 +51,17 @@ class EmotionSentimentAnalyzer:
         return sentiments
 
     def _determine_overall_sentiment(self, sentiments):
-        if all(sent == 'Positive' for sent in sentiments):
-            return 'Positive'
-        elif all(sent == 'Negative' for sent in sentiments):
-            return 'Negative'
-        else:
-            return 'Mixed'
+        sentiment_counts = {
+            "Negative": 0,
+            "Neutral": 0,
+            "Positive": 0
+        }
+
+        for sentiment in sentiments:
+            sentiment_counts[sentiment] += 1
+
+        overall_sentiment = max(sentiment_counts, key=sentiment_counts.get)
+        return overall_sentiment
 
 
 # Example usage
@@ -75,6 +80,4 @@ emotions, sentiments, overall_sentiment = analyzer.analyze(conversation)
 
 # Print results
 for message, emotion, sentiment in zip(conversation, emotions, sentiments):
-    print(f"{message} (Emotion: {emotion}, Sentiment: {sentiment})")
-
-print(f"\nOverall Sentiment: {overall_sentiment}")
+    print(f"{message}
