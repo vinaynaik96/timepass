@@ -1,6 +1,17 @@
 import torch
 from transformers import BertTokenizer, BertForSequenceClassification
 
+import random
+import numpy as np
+import torch
+
+# Set random seeds for reproducibility
+random.seed(42)
+np.random.seed(42)
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 # Load pre-trained BERT model and tokenizer
 model_name = 'bert-base-uncased'
 tokenizer = BertTokenizer.from_pretrained(model_name)
