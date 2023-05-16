@@ -1,60 +1,55 @@
 import torch
-from transformers import BertTokenizer, BertForSequenceClassification
-from deepmoji.model_def import deepmoji_transfer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class EmotionSentimentAnalyzer:
-    def __init__(self, deepmoji_model_path, deepmoji_vocab_path, bert_model_name):
-        # Load pre-trained DeepMoji model and tokenizer for emotion detection
-        self.deepmoji_model = deepmoji_transfer.DeepMojiModel(deepmoji_model_path, deepmoji_vocab_path)
-        self.deepmoji_tokenizer = deepmoji_transfer.get_tokenizer(deepmoji_vocab_path)
-        
-        # Load pre-trained BERT model and tokenizer for sentiment analysis
-        self.bert_tokenizer = BertTokenizer.from_pretrained(bert_model_name)
-        self.bert_model = BertForSequenceClassification.from_pretrained(bert_model_name, num_labels=3)
-        
-        # Set device (GPU if available, else CPU)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.deepmoji_model.to(self.device)
-        self.bert_model.to(self.device)
-        
-        self.emotion_labels = deepmoji_transfer.get_labels()
+    def __init__(self, emotion_model_name, sentiment_model_name):
+        self.emotion_tokenizer = AutoTokenizer.from_pretrained(emotion_model_name)
+        self.emotion_model = AutoModelForSequenceClassification.from_pretrained(emotion_model_name)
+        self.sentiment_tokenizer = AutoTokenizer.from_pretrained(sentiment_model_name)
+        self.sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model_name)
+        self.emotion_labels = ["joy", "sadness", "anger", "fear", "love", "surprise"]
         self.sentiment_labels = ["Negative", "Neutral", "Positive"]
 
     def analyze(self, conversation):
-        inputs = []
+        emotions = self._analyze_emotions(conversation)
+        sentiments = self._analyze_sentiments(conversation)
+        overall_sentiment = self._determine_overall_sentiment(sentiments)
+        return emotions, sentiments, overall_sentiment
+
+    def _analyze_emotions(self, conversation):
+        emotions = []
         for message in conversation:
             text = message.split(":")[1].strip()
-            inputs.append(text)
-        
-        emotions = self._detect_emotions(inputs)
-        sentiments = self._analyze_sentiments(inputs)
-        overall_sentiment = self._determine_overall_sentiment(sentiments)
-        
-        # Return results
-        return emotions, sentiments, overall_sentiment
-    
-    def _detect_emotions(self, inputs):
-        emotion_predictions = self.deepmoji_model(self.deepmoji_tokenizer.encode(inputs, return_tensors='pt').to(self.device))
-        emotion_predicted_labels = torch.argmax(emotion_predictions, dim=1).cpu().numpy()
-        emotions = [self.emotion_labels[label] for label in emotion_predicted_labels]
+            encoded_input = self.emotion_tokenizer.encode_plus(text, padding=True, truncation=True, return_tensors="pt")
+            input_ids = encoded_input["input_ids"]
+            attention_mask = encoded_input["attention_mask"]
+
+            with torch.no_grad():
+                logits = self.emotion_model(input_ids, attention_mask=attention_mask).logits
+
+            emotion_idx = torch.argmax(logits, dim=1).item()
+            emotion_label = self.emotion_labels[emotion_idx]
+            emotions.append(emotion_label)
+
         return emotions
-    
-    def _analyze_sentiments(self, inputs):
-        encoded_input = self.bert_tokenizer.batch_encode_plus(
-            inputs,
-            truncation=True,
-            padding=True,
-            max_length=128,
-            return_tensors='pt'
-        )
-        input_ids = encoded_input['input_ids'].to(self.device)
-        attention_mask = encoded_input['attention_mask'].to(self.device)
-        outputs = self.bert_model(input_ids, attention_mask=attention_mask)
-        logits = outputs.logits
-        predicted_labels = torch.argmax(logits, dim=1).cpu().numpy()
-        sentiments = [self.sentiment_labels[label] for label in predicted_labels]
+
+    def _analyze_sentiments(self, conversation):
+        sentiments = []
+        for message in conversation:
+            text = message.split(":")[1].strip()
+            encoded_input = self.sentiment_tokenizer.encode_plus(text, padding=True, truncation=True, return_tensors="pt")
+            input_ids = encoded_input["input_ids"]
+            attention_mask = encoded_input["attention_mask"]
+
+            with torch.no_grad():
+                logits = self.sentiment_model(input_ids, attention_mask=attention_mask).logits
+
+            sentiment_idx = torch.argmax(logits, dim=1).item()
+            sentiment_label = self.sentiment_labels[sentiment_idx]
+            sentiments.append(sentiment_label)
+
         return sentiments
-    
+
     def _determine_overall_sentiment(self, sentiments):
         if all(sent == 'Positive' for sent in sentiments):
             return 'Positive'
@@ -63,12 +58,12 @@ class EmotionSentimentAnalyzer:
         else:
             return 'Mixed'
 
-# Example usage
-deepmoji_model_path = 'path_to_pretrained_deepmoji_model'
-deepmoji_vocab_path = 'path_to_deepmoji_vocab'
-bert_model_name = 'bert-base-uncased'
 
-analyzer = EmotionSentimentAnalyzer(deepmoji_model_path, deepmoji_vocab_path, bert_model_name)
+# Example usage
+emotion_model_name = "cardiffnlp/twitter-roberta-base-emoji"
+sentiment_model_name = "bert-base-uncased"
+
+analyzer = EmotionSentimentAnalyzer(emotion_model_name, sentiment_model_name)
 
 conversation = [
     "User: How are you?",
@@ -80,7 +75,6 @@ emotions, sentiments, overall_sentiment = analyzer.analyze(conversation)
 
 # Print results
 for message, emotion, sentiment in zip(conversation, emotions, sentiments):
-print(f"{message} (Emotion: {emotion}, Sentiment: {sentiment})")
+    print(f"{message} (Emotion: {emotion}, Sentiment: {sentiment})")
 
 print(f"\nOverall Sentiment: {overall_sentiment}")
-
