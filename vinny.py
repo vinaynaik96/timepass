@@ -1,6 +1,14 @@
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 
+def get_sentiment_label(sentiment_score):
+    if sentiment_score >= 0.05:
+        return 'Positive'
+    elif sentiment_score <= -0.05:
+        return 'Negative'
+    else:
+        return 'Neutral'
+
 def analyze_sentiment(text):
     # Create a SentimentIntensityAnalyzer object
     sid = SentimentIntensityAnalyzer()
@@ -22,10 +30,13 @@ conversation = [
 
 # Analyze the sentiment of each message in the conversation
 sentiment_scores = []
+sentiment_labels = []
 for message in conversation:
     sentiment_score = analyze_sentiment(message['text'])
     sentiment_scores.append(sentiment_score)
+    sentiment_label = get_sentiment_label(sentiment_score)
+    sentiment_labels.append(sentiment_label)
 
-# Print the sentiment scores
+# Print the sentiment labels
 for i, message in enumerate(conversation):
-    print(f"Message {i+1} ({message['speaker']}): '{message['text']}' - Sentiment Score: {sentiment_scores[i]}")
+    print(f"Message {i+1} ({message['speaker']}): '{message['text']}' - Sentiment: {sentiment_labels[i]}")
