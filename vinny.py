@@ -31,19 +31,39 @@ convo3 = conversation[4:6]  # Helpdesk's third response and client's second mess
 
 # Analyze sentiment of conversation 1
 print("Conversation 1:")
+conversation_1_sentiment = ''
 for message in convo1:
     sentiment = analyze_sentiment(message.split(":")[1].strip())
     print(f"{message} (Sentiment: {sentiment})")
+    conversation_1_sentiment += sentiment + ' '
+
+print("Conversation 1 Overall Sentiment:", analyze_sentiment(conversation_1_sentiment))
 
 print()
 
 # Analyze sentiment of conversation 2
 print("Conversation 2:")
+conversation_2_sentiment = ''
 for message in convo2:
     sentiment = analyze_sentiment(message.split(":")[1].strip())
     print(f"{message} (Sentiment: {sentiment})")
+    conversation_2_sentiment += sentiment + ' '
+
+print("Conversation 2 Overall Sentiment:", analyze_sentiment(conversation_2_sentiment))
 
 print()
+
+# Analyze sentiment of conversation 3
+print("Conversation 3:")
+conversation_3_sentiment = ''
+for message in convo3:
+    sentiment = analyze_sentiment(message.split(":")[1].strip())
+    print(f"{message} (Sentiment: {sentiment})")
+    conversation_3_sentiment += sentiment + ' '
+
+print("Conversation 3 Overall Sentiment:", analyze_sentiment(conversation_3_sentiment))
+
+
 
 # Analyze sentiment of conversation 3
 print("Conversation 3:")
