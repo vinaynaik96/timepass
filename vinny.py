@@ -1,42 +1,52 @@
-import nltk
-from nltk.sentiment import SentimentIntensityAnalyzer
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
-def get_sentiment_label(sentiment_score):
-    if sentiment_score >= 0.05:
+def analyze_sentiment(text):
+    sid = SentimentIntensityAnalyzer()
+    sentiment_scores = sid.polarity_scores(text)
+    compound_score = sentiment_scores['compound']
+    
+    if compound_score >= 0.05:
         return 'Positive'
-    elif sentiment_score <= -0.05:
+    elif compound_score <= -0.05:
         return 'Negative'
     else:
         return 'Neutral'
 
-def analyze_sentiment(text):
-    # Create a SentimentIntensityAnalyzer object
-    sid = SentimentIntensityAnalyzer()
-    
-    # Analyze the sentiment of the text
-    sentiment_scores = sid.polarity_scores(text)
-    
-    # Return the compound sentiment score
-    return sentiment_scores['compound']
-
-# Example conversation between helpdesk and client
+# Example conversation
 conversation = [
-    {'speaker': 'helpdesk', 'text': 'How can I assist you today?'},
-    {'speaker': 'client', 'text': 'I'm having trouble with your product.'},
-    {'speaker': 'helpdesk', 'text': 'I apologize for the inconvenience. Please provide more details about the issue.'},
-    {'speaker': 'client', 'text': 'The product keeps crashing whenever I try to open it.'},
-    {'speaker': 'helpdesk', 'text': 'I understand your frustration. We'll do our best to resolve this issue for you.'},
+    "Helpdesk: Hi there! How can I assist you today?",
+    "Client: Hi, I'm having trouble accessing my account. I keep getting an error message.",
+    "Helpdesk: I'm sorry to hear that. Could you please provide me with your username so I can look into it?",
+    "Client: Sure, my username is johndoe123.",
+    "Helpdesk: Thank you, John. Let me check our system. Please bear with me for a moment.",
+    "Helpdesk: John, it seems that there was a temporary glitch in our system. I have resolved the issue for you.",
+    "Client: That's great! Thank you so much for your help.",
+    "Helpdesk: You're welcome, John! If you need any further assistance, feel free to ask. Have a great day!"
 ]
 
-# Analyze the sentiment of each message in the conversation
-sentiment_scores = []
-sentiment_labels = []
-for message in conversation:
-    sentiment_score = analyze_sentiment(message['text'])
-    sentiment_scores.append(sentiment_score)
-    sentiment_label = get_sentiment_label(sentiment_score)
-    sentiment_labels.append(sentiment_label)
+# Break conversation into three separate conversations
+convo1 = conversation[0:2]  # Helpdesk's first response and client's first message
+convo2 = conversation[2:4]  # Client's response and Helpdesk's second response
+convo3 = conversation[4:6]  # Helpdesk's third response and client's second message
 
-# Print the sentiment labels
-for i, message in enumerate(conversation):
-    print(f"Message {i+1} ({message['speaker']}): '{message['text']}' - Sentiment: {sentiment_labels[i]}")
+# Analyze sentiment of conversation 1
+print("Conversation 1:")
+for message in convo1:
+    sentiment = analyze_sentiment(message.split(":")[1].strip())
+    print(f"{message} (Sentiment: {sentiment})")
+
+print()
+
+# Analyze sentiment of conversation 2
+print("Conversation 2:")
+for message in convo2:
+    sentiment = analyze_sentiment(message.split(":")[1].strip())
+    print(f"{message} (Sentiment: {sentiment})")
+
+print()
+
+# Analyze sentiment of conversation 3
+print("Conversation 3:")
+for message in convo3:
+    sentiment = analyze_sentiment(message.split(":")[1].strip())
+    print(f"{message} (Sentiment: {sentiment})")
