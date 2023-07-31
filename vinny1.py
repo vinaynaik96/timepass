@@ -1,43 +1,44 @@
-from prometheus_client import start_http_server, Summary, Gauge
 import requests
-import time
 
-# Define the Prometheus Node Exporter endpoint URL
-PROMETHEUS_ENDPOINT = "http://localhost:9001/metrics"
+def get_node_exporter_metrics(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.text
+        else:
+            print(f"Failed to fetch metrics. Status code: {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"Error occurred while fetching metrics: {e}")
+        return None
 
-# Define a custom function to fetch the metrics from the Prometheus endpoint
-def get_metrics(url):
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.text
+def calculate_cpu_usage(metrics_text):
+    cpu_metrics = [line for line in metrics_text.splitlines() if line.startswith('cpu ')]
+    if not cpu_metrics:
+        return None
+
+    # Parse the CPU metrics
+    cpu_metrics = cpu_metrics[0].split()[1:]
+
+    # Calculate total CPU time
+    total_cpu_time = sum(map(int, cpu_metrics))
+
+    # Calculate idle CPU time
+    idle_cpu_time = int(cpu_metrics[3])
+
+    # Calculate CPU usage percentage
+    cpu_usage_percentage = 100.0 * (1.0 - idle_cpu_time / total_cpu_time)
+    return cpu_usage_percentage
+
+if __name__ == "__main__":
+    prometheus_node_exporter_url = "http://localhost:9001/metrics"
+
+    metrics_text = get_node_exporter_metrics(prometheus_node_exporter_url)
+    if metrics_text:
+        cpu_usage = calculate_cpu_usage(metrics_text)
+        if cpu_usage is not None:
+            print(f"CPU Usage: {cpu_usage:.2f}%")
+        else:
+            print("Failed to calculate CPU usage.")
     else:
-        raise Exception(f"Failed to fetch metrics. Status code: {response.status_code}")
-
-# Parse the Prometheus metrics to get the CPU usage
-def get_cpu_usage(metrics):
-    cpu_usage = None
-    for line in metrics.splitlines():
-        if line.startswith("node_cpu_seconds_total"):
-            _, _, mode = line.split("{")[1].strip("}").split(",")
-            if mode == 'mode="idle"':
-                cpu_usage = 100.0 - float(line.split()[-1])
-    return cpu_usage
-
-if __name__ == '__main__':
-    # Start an HTTP server to expose the metrics (optional)
-    start_http_server(8000)
-
-    # Infinite loop to continuously monitor CPU usage
-    while True:
-        try:
-            metrics = get_metrics(PROMETHEUS_ENDPOINT)
-            cpu_usage = get_cpu_usage(metrics)
-
-            if cpu_usage is not None:
-                print(f"CPU Usage: {cpu_usage:.2f}%")
-                # You can perform additional actions with the CPU usage value here
-
-        except Exception as e:
-            print(f"Error: {e}")
-
-        time.sleep(5)  # Adjust the interval as needed
+        print("Failed to fetch metrics from Prometheus Node Exporter.")
