@@ -2,22 +2,23 @@ import time
 from prometheus_api_client import PrometheusConnect
 
 def get_cpu_usage(prometheus_url):
-    prom = PrometheusConnect(url=prometheus_url)
-    query = '100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
     try:
+        prom = PrometheusConnect(url=prometheus_url)
+        query = '100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
         result = prom.custom_query(query)
-        if result:
-            cpu_usage = result[0]['value'][1]
+
+        if result and 'data' in result and 'result' in result['data']:
+            cpu_usage = result['data']['result'][0]['value'][1]
             return float(cpu_usage)
         else:
-            print("Error: No data returned from Prometheus.")
+            print("Error: No valid data returned from Prometheus.")
     except Exception as e:
         print(f"Error: {e}")
 
     return None
 
 if __name__ == "__main__":
-    prometheus_url = "http://your_prometheus_url/"
+    prometheus_url = "http://localhost:9001/metrics"
     while True:
         cpu_usage = get_cpu_usage(prometheus_url)
         if cpu_usage is not None:
