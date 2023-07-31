@@ -1,26 +1,25 @@
 import time
-import requests
+from prometheus_api_client import PrometheusConnect
 
-def get_cpu_usage(node_exporter_url):
+def get_cpu_usage(prometheus_url):
+    prom = PrometheusConnect(url=prometheus_url)
+    query = '100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
     try:
-        response = requests.get(node_exporter_url)
-        if response.status_code == 200:
-            metrics = response.text.splitlines()
-            for metric in metrics:
-                if metric.startswith('node_cpu_seconds_total{cpu="0", mode="idle"}'):
-                    _, cpu_usage = metric.split(' ')
-                    return float(cpu_usage)
+        result = prom.custom_query(query)
+        if result:
+            cpu_usage = result[0]['value'][1]
+            return float(cpu_usage)
         else:
-            print(f"Error: Unable to fetch data from {node_exporter_url}. Status code: {response.status_code}")
-    except requests.exceptions.RequestException as e:
+            print("Error: No data returned from Prometheus.")
+    except Exception as e:
         print(f"Error: {e}")
 
     return None
 
 if __name__ == "__main__":
-    node_exporter_url = "http://your_node_exporter_endpoint/metrics"
+    prometheus_url = "http://your_prometheus_url/"
     while True:
-        cpu_usage = get_cpu_usage(node_exporter_url)
+        cpu_usage = get_cpu_usage(prometheus_url)
         if cpu_usage is not None:
             print(f"CPU Usage: {cpu_usage:.2f}%")
         else:
