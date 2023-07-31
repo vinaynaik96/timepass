@@ -1,28 +1,58 @@
+import requests
 import time
-from prometheus_api_client import PrometheusConnect
+import matplotlib.pyplot as plt
 
-def get_cpu_usage(prometheus_url):
+def fetch_metrics(url):
     try:
-        prom = PrometheusConnect(url=prometheus_url)
-        query = '100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
-        result = prom.custom_query(query)
-
-        if result and 'data' in result and 'result' in result['data']:
-            cpu_usage = result['data']['result'][0]['value'][1]
-            return float(cpu_usage)
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.text
         else:
-            print("Error: No valid data returned from Prometheus.")
-    except Exception as e:
+            print(f"Failed to fetch metrics. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
         print(f"Error: {e}")
+        return None
 
-    return None
+def parse_metrics(metrics):
+    # Implement your logic here to parse the metrics data.
+    # The metrics variable will contain the raw text response from Prometheus.
+    # You need to extract and process the relevant data for monitoring.
+
+    # Example: You can split the metrics by lines and filter specific metrics.
+    # metrics_lines = metrics.split('\n')
+    # relevant_metrics = [line for line in metrics_lines if 'my_metric' in line]
+    pass
+
+def plot_metrics(x_data, y_data):
+    plt.plot(x_data, y_data)
+    plt.xlabel('Time')
+    plt.ylabel('Metric Value')
+    plt.title('Real-time Monitoring of Prometheus Metric')
+    plt.grid(True)
+    plt.show()
 
 if __name__ == "__main__":
     prometheus_url = "http://localhost:9001/metrics"
-    while True:
-        cpu_usage = get_cpu_usage(prometheus_url)
-        if cpu_usage is not None:
-            print(f"CPU Usage: {cpu_usage:.2f}%")
-        else:
-            print("Unable to retrieve CPU usage.")
-        time.sleep(1)  # Adjust the interval as needed (in seconds).
+    monitoring_interval = 5  # Seconds between each fetch and plot
+
+    x_data = []  # Timestamps
+    y_data = []  # Metric values
+
+    try:
+        while True:
+            metrics = fetch_metrics(prometheus_url)
+            if metrics:
+                # Parse the metrics data and extract relevant information
+                parsed_metrics = parse_metrics(metrics)
+
+                # Append the current timestamp and metric value to the data lists
+                # Example: x_data.append(timestamp), y_data.append(metric_value)
+
+                # Update the plot
+                plot_metrics(x_data, y_data)
+
+            # Wait for the next interval
+            time.sleep(monitoring_interval)
+
+    except KeyboardInterrupt:
+        print("Monitoring stopped.")
