@@ -1,58 +1,43 @@
+from prometheus_client import start_http_server, Summary, Gauge
 import requests
 import time
-import matplotlib.pyplot as plt
 
-def fetch_metrics(url):
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.text
-        else:
-            print(f"Failed to fetch metrics. Status code: {response.status_code}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
-        return None
+# Define the Prometheus Node Exporter endpoint URL
+PROMETHEUS_ENDPOINT = "http://localhost:9001/metrics"
 
-def parse_metrics(metrics):
-    # Implement your logic here to parse the metrics data.
-    # The metrics variable will contain the raw text response from Prometheus.
-    # You need to extract and process the relevant data for monitoring.
+# Define a custom function to fetch the metrics from the Prometheus endpoint
+def get_metrics(url):
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.text
+    else:
+        raise Exception(f"Failed to fetch metrics. Status code: {response.status_code}")
 
-    # Example: You can split the metrics by lines and filter specific metrics.
-    # metrics_lines = metrics.split('\n')
-    # relevant_metrics = [line for line in metrics_lines if 'my_metric' in line]
-    pass
+# Parse the Prometheus metrics to get the CPU usage
+def get_cpu_usage(metrics):
+    cpu_usage = None
+    for line in metrics.splitlines():
+        if line.startswith("node_cpu_seconds_total"):
+            _, _, mode = line.split("{")[1].strip("}").split(",")
+            if mode == 'mode="idle"':
+                cpu_usage = 100.0 - float(line.split()[-1])
+    return cpu_usage
 
-def plot_metrics(x_data, y_data):
-    plt.plot(x_data, y_data)
-    plt.xlabel('Time')
-    plt.ylabel('Metric Value')
-    plt.title('Real-time Monitoring of Prometheus Metric')
-    plt.grid(True)
-    plt.show()
+if __name__ == '__main__':
+    # Start an HTTP server to expose the metrics (optional)
+    start_http_server(8000)
 
-if __name__ == "__main__":
-    prometheus_url = "http://localhost:9001/metrics"
-    monitoring_interval = 5  # Seconds between each fetch and plot
+    # Infinite loop to continuously monitor CPU usage
+    while True:
+        try:
+            metrics = get_metrics(PROMETHEUS_ENDPOINT)
+            cpu_usage = get_cpu_usage(metrics)
 
-    x_data = []  # Timestamps
-    y_data = []  # Metric values
+            if cpu_usage is not None:
+                print(f"CPU Usage: {cpu_usage:.2f}%")
+                # You can perform additional actions with the CPU usage value here
 
-    try:
-        while True:
-            metrics = fetch_metrics(prometheus_url)
-            if metrics:
-                # Parse the metrics data and extract relevant information
-                parsed_metrics = parse_metrics(metrics)
+        except Exception as e:
+            print(f"Error: {e}")
 
-                # Append the current timestamp and metric value to the data lists
-                # Example: x_data.append(timestamp), y_data.append(metric_value)
-
-                # Update the plot
-                plot_metrics(x_data, y_data)
-
-            # Wait for the next interval
-            time.sleep(monitoring_interval)
-
-    except KeyboardInterrupt:
-        print("Monitoring stopped.")
+        time.sleep(5)  # Adjust the interval as needed
