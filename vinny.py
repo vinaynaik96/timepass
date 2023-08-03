@@ -4,7 +4,6 @@ import urllib.parse
 import requests
 import time
 import datetime, pytz
-from scipy.stats import pearsonr
 
 def fetch_data_from_db():
     password = "merck@1234"
@@ -19,6 +18,9 @@ def fetch_data_from_db():
 def send_alert(data):
     utc_time = datetime.datetime.now(pytz.timezone('UTC')).strftime("%I:%M:%S %p")
     return f"The CPU Utilization is {data} and Alert_Number:123456 at {utc_time}"
+
+def difference(actual, predicted):
+    return abs(actual - predicted)
 
 def monitor_prometheus(df, threshold=30):
     prome_sql = """(sum by(instance) (irate(node_cpu_seconds_total{mode!="idle"}[1m])) / on(instance) 
@@ -36,11 +38,11 @@ def monitor_prometheus(df, threshold=30):
                 print(alert_message)
                 # Fetch data from database again
                 df = fetch_data_from_db()
-                # Check correlation
-                correlation, _ = pearsonr(df['actual_cpu'], df['predicted_cpu'])  # replace with actual column names
-                if correlation > 0.5:  # replace with desired correlation threshold
-                    trace_result = df['trace_result']  # replace with actual column name
-                    print(f"Incident created. Trace result: {trace_result}")
+                # Check if the predicted CPU value is close to the actual value
+                predicted_cpu = df['predicted_cpu'].iloc[-1]  # get the latest predicted value
+                diff = difference(data, predicted_cpu)
+                if diff <= 10:  # compare with a tolerance of 10 units
+                    print(f"Incident created. Difference between actual CPU value {data} and predicted CPU value {predicted_cpu} is {diff}, which is within the allowed limit.")
         except Exception as e:
             print(f"error: {e}")
         time.sleep(60)
