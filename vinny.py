@@ -1,7 +1,16 @@
+import time
+import datetime
+import pytz
+import pandas as pd
+
 if __name__=="__main__":
     pred = Predict()
     db=DB()
     while True:
+        now = datetime.datetime.now()
+        seconds_until_next_minute = 60 - now.second - now.microsecond / 1E6
+        time.sleep(seconds_until_next_minute)
+
         result_dict={}
         df=db.fetch_data_from_db()
         temp1=pred.inf_prepare_dataset(df,2)
@@ -18,4 +27,3 @@ if __name__=="__main__":
         result_dict['Traces Result']=str(traces_pred)
         df = pd.DataFrame(result_dict, index=[0]) 
         push_result_to_DB(df)
-        time.sleep(60)
