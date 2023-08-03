@@ -1,29 +1,25 @@
+import requests
 import time
-import datetime
-import pytz
-import pandas as pd
+import json
 
-if __name__=="__main__":
-    pred = Predict()
-    db=DB()
+def monitor_prometheus(threshold=30):
+    prome_sql = """(sum by(instance) (irate(node_cpu_seconds_total{mode!="idle"}[1m])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total[1m])))) * 100"""
+    url= 'http://54.162.54.22:9090/api/v1/query'
+    params = {'query': prome_sql}
+    
     while True:
-        now = datetime.datetime.now()
-        seconds_until_next_minute = 60 - now.second - now.microsecond / 1E6
-        time.sleep(seconds_until_next_minute)
+        try:
+            response = requests.get(url,params=params)
+            data = float(response.json()["data"]['result'][0]['value'][1])
+            print(f"current value: {data}")
+            if data > threshold:
+                print(send_alert(data))        
+        except Exception as e:
+            print(f"error: {e}")
+        time.sleep(60)
 
-        result_dict={}
-        df=db.fetch_data_from_db()
-        temp1=pred.inf_prepare_dataset(df,2)
-        df = pd.DataFrame(temp1)     
-        df.drop(15,inplace=True,axis=1)
-        tz = pytz.timezone('UCT')
-        now = datetime.datetime.now(tz)
-        one_min_later = now + datetime.timedelta(minutes=1)
-        time_str = one_min_later.strftime("%m-%d-%Y, %H:%M:%S %p")
-        print(f"--------------- CPU Prediction for {time_str} ---------------")
-        result_dict['Time']=one_min_later
-        traces_pred,cpu_pred=predict(df)
-        result_dict['Predicted CPU']=cpu_pred
-        result_dict['Traces Result']=str(traces_pred)
-        df = pd.DataFrame(result_dict, index=[0]) 
-        push_result_to_DB(df)
+def send_alert(data):
+    return f"The CPU Utilization is {data} and Alert Number : 123456"
+    
+if __name__=="__main__":
+    monitor_prometheus()
