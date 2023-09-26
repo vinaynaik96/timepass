@@ -1,21 +1,19 @@
-from langchain.chat_models import AzureChatOpenAI
-from langchain.schema import HumanMessage
+import os
+import openai
 
-BASE_URL = "https://azureopenaicoe.openai.azure.com/"
-API_KEY = "ceea3c2ec4814ed89507f4ee06b907a2"
-DEPLOYMENT_NAME = "chat"
-model = AzureChatOpenAI(
-    openai_api_base=BASE_URL,
-    openai_api_version="2023-05-15",
-    deployment_name=DEPLOYMENT_NAME,
-    openai_api_key=API_KEY,
-    openai_api_type="azure",
-)
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-model(
-    [
-        HumanMessage(
-            content="create a python code which sum two argument"
-        )
-    ]
+response = openai.ChatCompletion.create(
+  model="gpt-3.5-turbo",
+  messages=[
+    {
+      "role": "user",
+      "content": "create a python code for compare 2 lists"
+    }
+  ],
+  temperature=1,
+  max_tokens=256,
+  top_p=1,
+  frequency_penalty=0,
+  presence_penalty=0
 )
