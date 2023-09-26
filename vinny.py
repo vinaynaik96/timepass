@@ -1,14 +1,4 @@
-
-import pandas as pd
-from sqlalchemy import create_engine
-import urllib
-
-def fetch_data_from_db():
-    password = "merck@1234"
-    encoded_password = urllib.parse.quote(password, safe='')
-    engine = create_engine(f"postgresql://merck_svc:{encoded_password}@54.205.22.2/merck_db")
-    
-    query = "SELECT * FROM prediction_result1"
-    df = pd.read_sql_query(query, engine)
-
-    return df
+os.environ["OPENAI_API_TYPE"] = "azure"
+os.environ["OPENAI_API_VERSION"] = "2023-05-15"
+os.environ["OPENAI_API_BASE"] = "https://azureopenaicoe.openai.azure.com/"
+os.environ["OPENAI_API_KEY"] = "ceea3c2ec4814ed89507f4ee06b907a2"
