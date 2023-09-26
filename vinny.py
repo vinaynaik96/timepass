@@ -1,21 +1,23 @@
-from langchain.chat_models import AzureChatOpenAI
-from langchain.schema import HumanMessage
+import openai
+import streamlit as st
 
-BASE_URL = "https://azureopenaicoe.openai.azure.com/"
-API_KEY = "ceea3c2ec4814ed89507f4ee06b907a2"
-DEPLOYMENT_NAME = "chat"
-model = AzureChatOpenAI(
-    openai_api_base=BASE_URL,
-    openai_api_version="2023-05-15",
-    deployment_name=DEPLOYMENT_NAME,
-    openai_api_key=API_KEY,
-    openai_api_type="azure",
-)
+# Load your Azure OpenAI API key
+openai.api_key = 'your-api-key'
 
-model(
-    [
-        HumanMessage(
-            content="create a python code which sum two argument"
-        )
-    ]
-)
+def generate_code(prompt):
+    response = openai.Completion.create(
+        engine="davinci-codex",  # Use the codex model
+        prompt=prompt,
+        max_tokens=150,
+        temperature=0.5
+    )
+    code = response['choices'][0]['text'].strip()
+    return code
+
+st.title('NLP to Python Code Generator')
+user_input = st.text_area("Enter your natural language prompt:", "e.g., Write a function to calculate the factorial of a number.")
+
+if st.button('Generate Code'):
+    with st.spinner('Generating Python Code...'):
+        generated_code = generate_code(user_input)
+        st.code(generated_code, language='python')
