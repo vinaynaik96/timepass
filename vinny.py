@@ -1,19 +1,17 @@
-import os
-import openai
+• Solid experience as a Machine Learning Engineer, with a focus on LLMs suitable for web environments.
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+• Proficiency in prominent machine learning frameworks, notably TensorFlow and PyTorch.
 
-response = openai.ChatCompletion.create(
-  model="gpt-3.5-turbo",
-  messages=[
-    {
-      "role": "user",
-      "content": "create a python code for compare 2 lists"
-    }
-  ],
-  temperature=1,
-  max_tokens=256,
-  top_p=1,
-  frequency_penalty=0,
-  presence_penalty=0
-)
+• Proven track record of training, fine-tuning, and deploying LLMs optimized for web platforms.
+
+• Deep comprehension of advanced techniques like prompt engineering, PEFT, LORA, and SFT in web contexts.
+
+• Hands-on expertise with the LangChain framework, including its modular abstractions and use-case specific chains for language model application.
+
+• Acquaintance with tools and practices for monitoring model performance and metrics on the web.
+
+• An innovative problem-solving mindset, combined with a flair for optimization.
+
+• Outstanding communication capabilities and a teamwork-oriented attitude.
+
+• A degree in Computer Science, Machine Learning, or a relevant domain.
