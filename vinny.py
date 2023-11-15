@@ -19,7 +19,7 @@ from langchain.prompts import (
 )
 from langchain.chains import LLMChain
 from langchain.chat_models import AzureChatOpenAI
-
+# LLM
 from langchain.memory import ConversationBufferMemory
 import os
 import openai
@@ -49,7 +49,7 @@ def render_clickable_link(lst):
                 st.write(f"{key}: {value}")
         st.write(" ")
         i=i+1
-
+            
 
 memory = ConversationBufferMemory()
 chat_llm = AzureChatOpenAI(deployment_name='chat')
@@ -68,7 +68,7 @@ prompt = ChatPromptTemplate(
         HumanMessagePromptTemplate.from_template("{question}")
     ]
 )
-memory = ConversationBufferMemory(sequence_length=5)  # Adjust the sequence_length as needed
+memory = ConversationBufferMemory(memory_key="chat_history",return_messages=True)
 
 conversation = LLMChain(
     llm=chat_llm,
@@ -80,6 +80,11 @@ conversation = LLMChain(
 st.set_page_config(page_title="Search The Bot Or Generate Your Own", page_icon="🦜")
 st.title("Search The Bot Or Generate Your Own")
 
+
+# df=pd.read_csv("/home/610776/llm/Utility/Botstabledata.csv")
+# df["long_description"] = df["overview"] +". "+ df["description"] + ". "+ df["hashtag"]
+# loader = DataFrameLoader(data_frame=df,page_content_column='long_description')
+# documents = loader.load()
 
 embeddings = OpenAIEmbeddings(deployment_name='text-embedding-ada-002')
 llm=AzureOpenAI(deployment_name='langchain')
@@ -106,141 +111,39 @@ with col2:
         disabled=st.session_state.disabled,
     )
 
+
 if prompt := st.chat_input(placeholder="Please Type Your Query"):
-    prompt_engg = prompt + " remember give me unique 3 bot names"
+    prompt_engg= prompt+" remember give me unique 3 bot names"
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
     
     with st.chat_message("assistant"):
         if option == "Get BotName":
-            # Your code for bot name retrieval
+            st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
+            response = compression_retriever.get_relevant_documents(prompt_engg)
+            res=[]
+            res1=[]
+            for data in response:
+                dct={}
+                bot_name=data.metadata['bot_name']
+                bot_name=bot_name.replace(" ", "")
+                bot_url=f"https://www.Botstore.com/botname={bot_name}"                
+                dct["Description"]=data.page_content
+                dct["BotName"]=data.metadata['bot_name']
+                dct["BotURL"]=bot_url              
+                output=f"Description : {data.page_content} \n BotName : {data.metadata['bot_name']}  \n BotURL : {bot_url}"
+                res.append(output)
+                res1.append(dct)
+            if len(res) ==0:
+                res="No Result Found , Please Give Valid Description"
+                st.write(res)
+            st.session_state.messages.append({"role": "assistant", "content": res})
             
-        elif option == "Code Assistant":
-            # Get the current conversation history from the memory
-            conversation_history = memory.get_conversation()
+            render_clickable_link(res1)
+        elif  option == "Code Assistant":
+            #chat_result=code_assistance(prompt)
             
-            # Construct a message with the current user input
-            user_message = {"role": "user", "content": prompt}
-            
-            # Append the user message to the conversation history
-            conversation_history.append(user_message)
-            
-            # Use the conversation with the updated history
-            chat_result = conversation({"question": prompt, "chat_history": conversation_history})
-            
-            # Append the assistant's response to the conversation history
-            assistant_message = {"role": "assistant", "content": chat_result['text']}
-            conversation_history.append(assistant_message)
-            
-            # Store the updated conversation history in the memory
-            memory.set_conversation(conversation_history)
-            
-            st.session_state.messages.append(assistant_message)
-            
-            # To see the full conversation history in the Streamlit app
-            full_conversation = memory.get_conversation()
-            st.write(full_conversation)
-
-    prompt_engg = prompt + " remember give me unique 3 bot names"
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    
-    with st.chat_message("assistant"):
-        if option == "Get BotName":
-            # Your code for bot name retrieval
-            
-        elif option == "Code Assistant":
-            # Get the current conversation history from the memory
-            conversation_history = memory.get_conversation()
-            
-            # Construct a message with the current user input
-            user_message = {"role": "user", "content": prompt}
-            
-            # Append the user message to the conversation history
-            conversation_history.append(user_message)
-            
-            # Use the conversation with the updated history
-            chat_result = conversation({"question": prompt, "chat_history": conversation_history})
-            
-            # Append the assistant's response to the conversation history
-            assistant_message = {"role": "assistant", "content": chat_result['text']}
-            conversation_history.append(assistant_message)
-            
-            # Store the updated conversation history in the memory
-            memory.set_conversation(conversation_history)
-            
-            st.session_state.messages.append(assistant_message)
-            
-            # To see the full conversation history in the Streamlit app
-            full_conversation = memory.get_conversation()
-            st.write(full_conversation)
-
-    prompt_engg = prompt + " remember give me unique 3 bot names"
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    
-    with st.chat_message("assistant"):
-        if option == "Get BotName":
-            # Your code for bot name retrieval
-            
-        elif option == "Code Assistant":
-            # Get the current conversation history from the memory
-            conversation_history = memory.get_conversation()
-            
-            # Construct a message with the current user input
-            user_message = {"role": "user", "content": prompt}
-            
-            # Append the user message to the conversation history
-            conversation_history.append(user_message)
-            
-            # Use the conversation with the updated history
-            chat_result = conversation({"question": prompt, "chat_history": conversation_history})
-            
-            # Append the assistant's response to the conversation history
-            assistant_message = {"role": "assistant", "content": chat_result['text']}
-            conversation_history.append(assistant_message)
-            
-            # Store the updated conversation history in the memory
-            memory.set_conversation(conversation_history)
-            
-            st.session_state.messages.append(assistant_message)
-            
-            # To see the full conversation history in the Streamlit app
-            full_conversation = memory.get_conversation()
-            st.write(full_conversation)
-
-    prompt_engg = prompt + " remember give me unique 3 bot names"
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    
-    with st.chat_message("assistant"):
-         if option == "Get BotName":
-
-            # Your code for bot name retrieval
-            
-            if option == "Code Assistant":
-            # Get the current conversation history from the memory
-                conversation_history = memory.get_conversation()
-            
-            # Construct a message with the current user input
-                user_message = {"role": "user", "content": prompt}
-            
-            # Append the user message to the conversation history
-                conversation_history.append(user_message)
-            
-            # Use the conversation with the updated history
-                chat_result = conversation({"question": prompt, "chat_history": conversation_history})
-            
-            # Append the assistant's response to the conversation history
-                assistant_message = {"role": "assistant", "content": chat_result['text']}
-                conversation_history.append(assistant_message)
-            
-            # Store the updated conversation history in the memory
-                memory.set_conversation(conversation_history)
-            
-                st.session_state.messages.append(assistant_message)
-            
-            # To see the full conversation history in the Streamlit app
-                full_conversation = memory.get_conversation()
-                st.write(full_conversation)
-
+            chat_result=conversation({"question": prompt})
+            #st.write(st.session_state.messages)
+            st.session_state.messages.append({"role": "assistant", "content": chat_result['text']})
+            st.write(chat_result['text'])
