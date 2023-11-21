@@ -12,6 +12,7 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
 )
 from langchain.chains import LLMChain
+from langchain.conversation_buffer_memory import ConversationBufferWindowMemory
 import os
 
 os.environ["OPENAI_API_TYPE"] = "azure"
@@ -45,31 +46,19 @@ retriever = Chroma(persist_directory="./Botstabledata_db", embedding_function=em
 compressor = LLMChainExtractor.from_llm(llm)
 compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
 
-if "user_messages" not in st.session_state:
-    st.session_state.user_messages = []
+conversation_buffer = ConversationBufferWindowMemory()
 
-if "bot_responses" not in st.session_state:
-    st.session_state.bot_responses = []
+if st.session_state.get("conversation"):
+    conversation_buffer.load(st.session_state["conversation"])
 
-def update_user_messages(content):
-    st.session_state.user_messages.append(content)
-
-def update_bot_responses(content):
-    st.session_state.bot_responses.append(content)
-
-for user_msg in st.session_state.user_messages:
-    st.chat_message("user").write(user_msg)
-
-for bot_resp in st.session_state.bot_responses:
-    st.chat_message("assistant").write(bot_resp)
+conversation_buffer.display(st)
 
 if prompt := st.chat_input(placeholder="Please Type Your Query"):
     prompt_engg = prompt + " remember give me unique 3 bot names"
-    update_user_messages(prompt)
-    st.chat_message("user").write(prompt)
+    conversation_buffer.add_message("user", prompt)
+    conversation_buffer.display(st)
 
-    with st.chat_message("assistant"):
-        st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
+    with st.empty():
         response = compression_retriever.get_relevant_documents(prompt_engg)
         res = []
         res1 = []
@@ -87,5 +76,10 @@ if prompt := st.chat_input(placeholder="Please Type Your Query"):
         if len(res) == 0:
             res = "No Result Found, Please Give Valid Description"
             st.write(res)
-        update_bot_responses(res)
+        conversation_buffer.add_message("assistant", res)
+        conversation_buffer.display(st)
+        for msg in res:
+            st.write(msg)
         render_clickable_link(res1)
+
+st.session_state["conversation"] = conversation_buffer.dump()
