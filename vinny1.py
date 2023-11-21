@@ -12,7 +12,6 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
 )
 from langchain.chains import LLMChain
-from langchain.conversation_buffer_memory import ConversationBufferWindowMemory
 import os
 
 os.environ["OPENAI_API_TYPE"] = "azure"
@@ -46,19 +45,29 @@ retriever = Chroma(persist_directory="./Botstabledata_db", embedding_function=em
 compressor = LLMChainExtractor.from_llm(llm)
 compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
 
-conversation_buffer = ConversationBufferWindowMemory()
+if "messages" not in st.session_state or st.sidebar.button("Clear conversation history"):
+    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
-if st.session_state.get("conversation"):
-    conversation_buffer.load(st.session_state["conversation"])
+if "conversation_buffer" not in st.session_state:
+    st.session_state.conversation_buffer = []
 
-conversation_buffer.display(st)
+# Function to update conversation buffer memory
+def update_conversation_buffer(role, content):
+    st.session_state.conversation_buffer.append({"role": role, "content": content})
 
+# Display conversation history
+for msg in st.session_state.conversation_buffer:
+    st.chat_message(msg["role"]).write(msg["content"])
+
+# Inside the chat input block where you process user input
 if prompt := st.chat_input(placeholder="Please Type Your Query"):
     prompt_engg = prompt + " remember give me unique 3 bot names"
-    conversation_buffer.add_message("user", prompt)
-    conversation_buffer.display(st)
-
-    with st.empty():
+    update_conversation_buffer("user", prompt)  # Store user input in conversational buffer
+    st.chat_message("user").write(prompt)
+    
+    # Assistant response handling
+    with st.chat_message("assistant"):
+        st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
         response = compression_retriever.get_relevant_documents(prompt_engg)
         res = []
         res1 = []
@@ -66,20 +75,16 @@ if prompt := st.chat_input(placeholder="Please Type Your Query"):
             dct = {}
             bot_name = data.metadata['bot_name']
             bot_name = bot_name.replace(" ", "")
-            bot_url = f"https://www.Botstore.com/botname={bot_name}"
+            bot_url = f"https://www.Botstore.com/botname={bot_name}"                
             dct["Description"] = data.page_content
             dct["BotName"] = data.metadata['bot_name']
-            dct["BotURL"] = bot_url
+            dct["BotURL"] = bot_url              
             output = f"Description : {data.page_content} \n BotName : {data.metadata['bot_name']}  \n BotURL : {bot_url}"
             res.append(output)
             res1.append(dct)
         if len(res) == 0:
             res = "No Result Found, Please Give Valid Description"
             st.write(res)
-        conversation_buffer.add_message("assistant", res)
-        conversation_buffer.display(st)
-        for msg in res:
-            st.write(msg)
+        st.session_state.messages.append({"role": "assistant", "content": res})
+        update_conversation_buffer("assistant", res)  # Store assistant response in conversational buffer
         render_clickable_link(res1)
-
-st.session_state["conversation"] = conversation_buffer.dump()
