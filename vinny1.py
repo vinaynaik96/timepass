@@ -11,7 +11,6 @@ from langchain.prompts import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
-from langchain.chains import LLMChain
 import os
 
 os.environ["OPENAI_API_TYPE"] = "azure"
@@ -23,7 +22,7 @@ def clear_submit():
     st.session_state["submit"] = False
 
 def render_clickable_link(lst):
-    i = 0
+    i=0
     for dictionary in lst:
         st.write(f"{i}:")
         for key, value in dictionary.items():
@@ -32,8 +31,8 @@ def render_clickable_link(lst):
             else:
                 st.write(f"{key}: {value}")
         st.write(" ")
-        i += 1
-
+        i=i+1
+        
 st.set_page_config(page_title="Search The Bot Or Generate Your Own", page_icon="🦜")
 st.title("Search The Bot Or Generate Your Own")
 
@@ -47,32 +46,29 @@ compression_retriever = ContextualCompressionRetriever(base_compressor=compresso
 
 if "messages" not in st.session_state or st.sidebar.button("Clear conversation history"):
     st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+else:
+    context = "\n".join([msg["content"] for msg in st.session_state["messages"]])
+    llm.add_training_data(context)
 
-if "conversation_buffer" not in st.session_state:
-    st.session_state.conversation_buffer = []
-
-# Function to update conversation buffer memory
-def update_conversation_buffer(role, content):
-    st.session_state.conversation_buffer.append({"role": role, "content": content})
-
-# Display conversation history
-for msg in st.session_state.conversation_buffer:
+for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-# Inside the chat input block where you process user input
+if "visibility" not in st.session_state:
+    st.session_state.visibility = "visible"
+    st.session_state.disabled = False
+
 if prompt := st.chat_input(placeholder="Please Type Your Query"):
     prompt_engg = prompt + " remember give me unique 3 bot names"
-    update_conversation_buffer("user", prompt)  # Store user input in conversational buffer
+    st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
     
-    # Assistant response handling
     with st.chat_message("assistant"):
         st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
         response = compression_retriever.get_relevant_documents(prompt_engg)
-        res = []
-        res1 = []
+        res=[]
+        res1=[]
         for data in response:
-            dct = {}
+            dct={}
             bot_name = data.metadata['bot_name']
             bot_name = bot_name.replace(" ", "")
             bot_url = f"https://www.Botstore.com/botname={bot_name}"                
@@ -86,5 +82,4 @@ if prompt := st.chat_input(placeholder="Please Type Your Query"):
             res = "No Result Found, Please Give Valid Description"
             st.write(res)
         st.session_state.messages.append({"role": "assistant", "content": res})
-        update_conversation_buffer("assistant", res)  # Store assistant response in conversational buffer
         render_clickable_link(res1)
