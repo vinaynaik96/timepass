@@ -1,53 +1,90 @@
-def send_alert(data):
-    url_alert = 'https://cognizantcri.service-now.com/api/now/table/em_alert'
-    url_incident = 'https://cognizantcri.service-now.com/api/now/table/incident'
-    user = "username"
-    pwd = "password"
+from langchain.callbacks import StreamlitCallbackHandler
+import streamlit as st
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.llms import AzureOpenAI
+from langchain.vectorstores import Chroma
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
+from langchain.prompts import (
+    ChatPromptTemplate,
+    MessagesPlaceholder,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from langchain.chains import LLMChain
+import os
 
-    alert_details = {
-        "alert_id": "ALERT12345",
-        "source": "Monitoring System",
-        "node": "Server123",
-        "type": "CPU Utilization High",
-        "resource": "CPU",
-        "metric_name": "CPU Utilization",
-        "severity": "1",
-        "description": f"CPU Utilization is high on Server123, current value is {data}",
-        "state": "open",
-        "additional_info": f"CPU Utilization has been above 90% for the last 15 minutes, current value is {data}",
-        "short_description": "High CPU Utilization on Server123"
-    }
+os.environ["OPENAI_API_TYPE"] = "azure"
+os.environ["OPENAI_API_VERSION"] = "2023-05-15"
+os.environ["OPENAI_API_BASE"] = "https://azureopenaicoe.openai.azure.com/"
+os.environ["OPENAI_API_KEY"] = "ceea3c2ec4814ed89507f4ee06b907a2"
 
-    incident_details = {
-        "short_description": "High CPU Utilization on Server123",
-        "description": f"CPU Utilization is high on Server123, current value is {data}",
-        "priority": "1",
-        "severity": "1",
-        "state": "New",
-        "category": "Hardware",
-        "subcategory": "CPU"
-    }
+def clear_submit():
+    st.session_state["submit"] = False
 
-    headers = {"Content-Type":"application/json","Accept":"application/json"}
+def render_clickable_link(lst):
+    i = 0
+    for dictionary in lst:
+        st.write(f"{i}:")
+        for key, value in dictionary.items():
+            if key == "BotURL":
+                st.markdown(f"{key}: [{value}]({value})")
+            else:
+                st.write(f"{key}: {value}")
+        st.write(" ")
+        i += 1
 
-    # Create alert
-    response_alert = requests.post(url_alert, auth=(user, pwd), headers=headers, data=json.dumps(alert_details))
-    if response_alert.status_code == 200: 
-        print('Status:', response_alert.status_code, 'Headers:', response_alert.headers, 'Error Response:',response_alert.json())
-    response_data_alert = response_alert.json()
+st.set_page_config(page_title="Search The Bot Or Generate Your Own", page_icon="🦜")
+st.title("Search The Bot Or Generate Your Own")
 
-    if response_alert.status_code == 200 or response_alert.status_code == 201:
-        alert_number = response_data_alert['result']['sys_id']  # replace 'sys_id' with the actual field name
-        print(f"Alert is created for CPU value {data} at {time.ctime()}, and alert number is {alert_number}")
-    else:
-        print(response_data_alert)
+embeddings = OpenAIEmbeddings(deployment_name='text-embedding-ada-002')
+llm = AzureOpenAI(deployment_name='langchain')
 
-    # Create incident
-    response_incident = requests.post(url_incident, auth=(user, pwd), headers=headers, data=json.dumps(incident_details))
-    response_data_incident = response_incident.json()
+retriever = Chroma(persist_directory="./Botstabledata_db", embedding_function=embeddings).as_retriever()
 
-    if response_incident.status_code == 200 or response_incident.status_code == 201:
-        incident_number = response_data_incident['result']['number']  # replace 'number' with the actual field name
-        print(f"Incident is created for CPU value {data} at {time.ctime()}, and incident number is {incident_number}")
-    else:
-        print(response_data_incident)
+compressor = LLMChainExtractor.from_llm(llm)
+compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
+
+if "messages" not in st.session_state or st.sidebar.button("Clear conversation history"):
+    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+
+if "conversation_buffer" not in st.session_state:
+    st.session_state.conversation_buffer = []
+
+# Function to update conversation buffer memory
+def update_conversation_buffer(role, content):
+    st.session_state.conversation_buffer.append({"role": role, "content": content})
+
+# Display conversation history
+for msg in st.session_state.conversation_buffer:
+    st.chat_message(msg["role"]).write(msg["content"])
+
+# Inside the chat input block where you process user input
+if prompt := st.chat_input(placeholder="Please Type Your Query"):
+    prompt_engg = prompt + " remember give me unique 3 bot names"
+    update_conversation_buffer("user", prompt)  # Store user input in conversational buffer
+    st.chat_message("user").write(prompt)
+    
+    # Assistant response handling
+    with st.chat_message("assistant"):
+        st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
+        response = compression_retriever.get_relevant_documents(prompt_engg)
+        res = []
+        res1 = []
+        for data in response:
+            dct = {}
+            bot_name = data.metadata['bot_name']
+            bot_name = bot_name.replace(" ", "")
+            bot_url = f"https://www.Botstore.com/botname={bot_name}"                
+            dct["Description"] = data.page_content
+            dct["BotName"] = data.metadata['bot_name']
+            dct["BotURL"] = bot_url              
+            output = f"Description : {data.page_content} \n BotName : {data.metadata['bot_name']}  \n BotURL : {bot_url}"
+            res.append(output)
+            res1.append(dct)
+        if len(res) == 0:
+            res = "No Result Found, Please Give Valid Description"
+            st.write(res)
+        st.session_state.messages.append({"role": "assistant", "content": res})
+        update_conversation_buffer("assistant", res)  # Store assistant response in conversational buffer
+        render_clickable_link(res1)
