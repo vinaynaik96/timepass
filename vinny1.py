@@ -59,29 +59,31 @@ qa = create_chain(llm=llm, prompt=prompt, CONDENSE_QUESTION_PROMPT=CONDENSE_QUES
 # Check session_state for existing conversation history or create a new one
 if "messages" not in st.session_state or st.sidebar.button("Clear conversation history"):
     st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+    st.session_state["context"] = ""  # Initialize context
 
 st.title('🦜🔗 Q&A ChatBot')
 
-if prompt := st.text_input("Please Type Your Query"):
-    query = prompt + " remember give me unique 3 bot names"
-    st.session_state["messages"].append({"role": "user", "content": prompt})
+while True:
+    with st.form("user_input"):
+        user_query = st.text_input("You:", key="user_input")
+        submit_button = st.form_submit_button(label='Send')
 
-    with st.spinner("Thinking..."):
-        response = qa({"question": query})
-        count = 1
-        for data in response["source_documents"]:
-            dct = {}
-            bot_name = data.metadata['bot_name']
-            bot_name = bot_name.replace(" ", "")
-            bot_url = f"https://www.Botstore.com/botname={bot_name}"                
-            dct["Description"] = data.page_content
-            dct["BotName"] = data.metadata['bot_name']
-            dct["BotURL"] = bot_url
-            output = f"{count}) BotName : {data.metadata['bot_name']} \n\n Description : {data.page_content} \n\n BotURL : {bot_url}\n\n\n"
-            st.write(output)
-            count += 1
-        if len(response["source_documents"]) == 0:
-            st.write("No Result Found. Please provide a valid description.")
+    if submit_button:
+        query = user_query + " remember give me unique 3 bot names"
+        st.session_state["messages"].append({"role": "user", "content": user_query})
 
-        # Update session_state with assistant's response
-        st.session_state["messages"].append({"role": "assistant", "content": response})
+        context = st.session_state["context"]
+        if context:
+            query = f"{context} {query}"  # Include previous context
+
+        with st.spinner("Thinking..."):
+            response = qa({"question": query})
+
+            st.session_state["messages"].append({"role": "assistant", "content": response})
+            st.session_state["context"] = response.get("context", "")
+
+        for msg in st.session_state["messages"]:
+            if msg["role"] == "user":
+                st.text_input("You:", value=msg["content"], disabled=True)
+            else:
+                st.text_input("Assistant:", value=msg["content"], disabled=True)
