@@ -1,82 +1,46 @@
-from langchain.callbacks import StreamlitCallbackHandler
-import streamlit as st
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.llms import AzureOpenAI
+from langchain.text_splitter import Language
+from langchain.document_loaders.generic import GenericLoader
+from langchain.document_loaders.parsers import LanguageParser
+from langchain.chat_models import AzureChatOpenAI
+from langchain.callbacks.manager import CallbackManager
+from langchain.memory import ConversationSummaryMemory
+from langchain.chains import ConversationalRetrievalChain
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.vectorstores import Chroma
-from langchain.retrievers import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import LLMChainExtractor
-from langchain.prompts import (
-    ChatPromptTemplate,
-    MessagesPlaceholder,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
-from langchain.chains import LLMChain
+from langchain.embeddings import AzureOpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 import os
 
 os.environ["OPENAI_API_TYPE"] = "azure"
 os.environ["OPENAI_API_VERSION"] = "2023-05-15"
-os.environ["OPENAI_API_BASE"] = "https://azureopenaicoe.openai.azure.com/"
-os.environ["OPENAI_API_KEY"] = "ceea3c2ec4814ed89507f4ee06b907a2"
+os.environ["OPENAI_API_KEY"] = "22c2ca1a04134562be1ab848aaba7d9c"
+os.environ["OPENAI_API_BASE"] = "https://coeaoai.openai.azure.com/"
 
-def clear_submit():
-    st.session_state["submit"] = False
+loader = GenericLoader.from_filesystem(
+    "./test_repo/langchain/libs/langchain",
+    glob="*",
+    suffixes=[".py", ".js"],
+    parser=LanguageParser(),
+)
+documents = loader.load()
 
-def render_clickable_link(lst):
-    i=0
-    for dictionary in lst:
-        st.write(f"{i}:")
-        for key, value in dictionary.items():
-            if key == "BotURL":
-                st.markdown(f"{key}: [{value}]({value})")
-            else:
-                st.write(f"{key}: {value}")
-        st.write(" ")
-        i=i+1
-        
-st.set_page_config(page_title="Search The Bot Or Generate Your Own", page_icon="🦜")
-st.title("Search The Bot Or Generate Your Own")
+python_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.PYTHON,
+                                                               chunk_size=2000,
+                                                               chunk_overlap=200)
+texts = python_splitter.split_documents(documents)
 
-embeddings = OpenAIEmbeddings(deployment_name='text-embedding-ada-002')
-llm=AzureOpenAI(deployment_name='langchain')
+embeddings = AzureOpenAIEmbeddings(azure_deployment='text-embedding-ada-002')
 
-retriever = Chroma(persist_directory="./Botstabledata_db", embedding_function=embeddings).as_retriever()
+db = Chroma.from_documents(texts, embedding = embeddings)
+retriever = db.as_retriever( search_type="mmr", search_kwargs={"k": 8})
 
-compressor = LLMChainExtractor.from_llm(llm)
-compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
+callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+llm=AzureChatOpenAI(deployment_name='chat', callback_manager=callback_manager, verbose=True)
 
-if "messages" not in st.session_state or st.sidebar.button("Clear conversation history"):
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+memory = ConversationSummaryMemory(llm=llm,memory_key="chat_history",return_messages=True)
+qa = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, memory=memory)
 
-if "visibility" not in st.session_state:
-    st.session_state.visibility = "visible"
-    st.session_state.disabled = False
-
-if prompt := st.chat_input(placeholder="Please Type Your Query"):
-    prompt_engg= prompt+" remember give me unique 3 bot names"
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    
-    with st.chat_message("assistant"):
-            st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
-            response = compression_retriever.get_relevant_documents(prompt_engg)
-            res=[]
-            res1=[]
-            for data in response:
-                dct={}
-                bot_name=data.metadata['bot_name']
-                bot_name=bot_name.replace(" ", "")
-                bot_url=f"https://www.Botstore.com/botname={bot_name}"                
-                dct["Description"]=data.page_content
-                dct["BotName"]=data.metadata['bot_name']
-                dct["BotURL"]=bot_url              
-                output=f"Description : {data.page_content} \n BotName : {data.metadata['bot_name']}  \n BotURL : {bot_url}"
-                res.append(output)
-                res1.append(dct)
-            if len(res) ==0:
-                res="No Result Found , Please Give Valid Description"
-                st.write(res)
-            st.session_state.messages.append({"role": "assistant", "content": res})
-            render_clickable_link(res1)
+question = "What is code all about?"
+result = qa(question)
+result['answer']
