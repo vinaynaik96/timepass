@@ -1,121 +1,93 @@
 import streamlit as st
+import tempfile
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders.generic import GenericLoader
+from langchain.document_loaders.parsers import LanguageParser
 from langchain.embeddings import AzureOpenAIEmbeddings
-from langchain.chat_models import AzureChatOpenAI
-from langchain.callbacks import StreamlitCallbackHandler
-import streamlit as st
-from langchain.callbacks.manager import CallbackManager
-import os
 from langchain.vectorstores import Chroma
-from langchain.embeddings import AzureOpenAIEmbeddings
-from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory
-from langchain.memory import ConversationTokenBufferMemory
-from langchain.chains import ConversationalRetrievalChain
+from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from code import *
+from langchain.chat_models import AzureChatOpenAI
+from langchain.memory import ConversationSummaryMemory
+from langchain.chains import ConversationalRetrievalChain
+from langchain.text_splitter import Language
+from langchain.document_loaders import NotebookLoader, PythonLoader
 
 import os
+
 os.environ["OPENAI_API_TYPE"] = "azure"
 os.environ["OPENAI_API_VERSION"] = "2023-05-15"
 os.environ["OPENAI_API_KEY"] = "22c2ca1a04134562be1ab848aaba7d9c"
 os.environ["OPENAI_API_BASE"] = "https://coeaoai.openai.azure.com/"
 
-# Using object notation
-select = st.sidebar.selectbox(
-    "Select a Bot Feature",
-    ("Q&A Search Bot", "Code Assitance", "Code Explainability Bot")
-)
+FILE_LOADER_MAPPING = {
+    "ipynb": (NotebookLoader, {}),
+    "py": (PythonLoader, {}),
+}
 
-embeddings = AzureOpenAIEmbeddings(azure_deployment='text-embedding-ada-002')
+def create_vector_database(documents):
+    python_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.PYTHON,
+                                                               chunk_size=2000,
+                                                               chunk_overlap=200)
+    texts = python_splitter.split_documents(documents)
+    embeddings = AzureOpenAIEmbeddings(azure_deployment='text-embedding-ada-002')
+    persist_directory = 'code_db'
+    # Create and persist a Chroma vector database from the chunked documents
+    db = Chroma.from_documents(
+        documents=texts,
+        embedding=embeddings,
+        persist_directory=persist_directory
+        # persist_directory=DB_DIR,
+    )
+    db.persist()
 
-callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-llm=AzureChatOpenAI(deployment_name='chat', callback_manager=callback_manager, verbose=True)
+    return persist_directory, embeddings
 
-def create_chain(llm, prompt, CONDENSE_QUESTION_PROMPT, db):
-    memory = ConversationTokenBufferMemory(llm=llm, memory_key="chat_history", return_messages=True, input_key='question',      
-                                           output_key='answer')
-    chain = ConversationalRetrievalChain.from_llm(llm=llm,chain_type="stuff",retriever=db.as_retriever(search_kwargs={"k": 3}),
-                                                  return_source_documents=True, max_tokens_limit=256,
-                                                  combine_docs_chain_kwargs={"prompt": prompt},
-                                                  condense_question_prompt=CONDENSE_QUESTION_PROMPT, memory=memory,)
-    return chain
+def run_code_rag():
+    st.title("Code Description")
+     # Upload files
+    uploaded_files = st.file_uploader("Upload your documents", type=[ "py", "ipynb"], accept_multiple_files=True)
+    loaded_documents = []
 
-def set_custom_prompt_condense():
-    _template = """Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question, in its original language.
-    Chat History:
-    {chat_history}
-    Follow Up Input: {question}
-    Standalone question:"""
-    CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(_template)
-    return CONDENSE_QUESTION_PROMPT
-
-def set_custom_prompt():
-    prompt_template = """Use the following pieces of information to answer the user's question.
-    If you don't know the answer, just say that you don't know, don't try to make up an answer.
-    Context: {context}
-    Question: {question}
-    Only return the helpful answer below and nothing else.
-    Helpful answer:
-    """
-    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    return prompt
-
-prompt = set_custom_prompt()
-CONDENSE_QUESTION_PROMPT = set_custom_prompt_condense()
-
-# load from disk
-db = Chroma(persist_directory="Botstabledata_db", embedding_function=embeddings)
-qa = create_chain(llm=llm, prompt=prompt,CONDENSE_QUESTION_PROMPT=CONDENSE_QUESTION_PROMPT, db=db)
-
-if "messages" not in st.session_state or st.sidebar.button("Clear conversation history",key=1):
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+    if uploaded_files:
+            # Create a temporary directory
+        with tempfile.TemporaryDirectory() as td:
+                # Move the uploaded files to the temporary directory and process them
+                for uploaded_file in uploaded_files:
+                    st.write(f"Uploaded: {uploaded_file.name}")
+                    ext = os.path.splitext(uploaded_file.name)[-1][1:].lower()
+                    st.write(f"Uploaded: {ext}")
     
-if "visibility" not in st.session_state:
-    st.session_state.visibility = "visible"
-    st.session_state.disabled = False    
+                    # Check if the extension is in FILE_LOADER_MAPPING
+                    if ext in FILE_LOADER_MAPPING:
+                        loader_class, loader_args = FILE_LOADER_MAPPING[ext]
+                        # st.write(f"loader_class: {loader_class}")
     
-if "Q&A Search Bot" in select: 
-    st.title("Q&A Search Bot")
-    if prompt := st.chat_input(placeholder="Please Type Your Query",key=2):
-        query= prompt+" remember give me unique 3 bot names"
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
-        
-        with st.chat_message("assistant"):
-                response = bot_response = qa({"question": query})
-                count = 1
-                for data in response["source_documents"]:
-                    dct={}
-                    bot_name=data.metadata['bot_name']
-                    bot_name=bot_name.replace(" ", "")
-                    bot_url=f"https://www.Botstore.com/botname={bot_name}"                
-                    dct["Description"]=data.page_content
-                    dct["BotName"]=data.metadata['bot_name']
-                    dct["BotURL"]=bot_url
-                    output=f"{count}) BotName : {data.metadata['bot_name']} \n\n Description : {data.page_content} \n\n BotURL : {bot_url}\n\n\n"
-                    st.write(output)
-                    count += 1
-                if len(bot_response["source_documents"]) == 0:
-                    st.write("No Result Found , Please Give Valid Description")
+                        # Save the uploaded file to the temporary directory
+                        file_path = os.path.join(td, uploaded_file.name)
+                        with open(file_path, 'wb') as temp_file:
+                            temp_file.write(uploaded_file.read())
+    
+                        # Use Langchain loader to process the file
+                        loader = loader_class(file_path, **loader_args)
+                        documents = loader.load()
+                        loaded_documents.extend(loader.load())
+                    else:
+                        st.warning(f"Unsupported file extension: {ext}")
                         
-if "Code Assitance" in select:
+        persist_directory, embeddings = create_vector_database(loaded_documents)
+        db = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+        
+        retriever = db.as_retriever( search_type="mmr", search_kwargs={"k": 8})
+        
+        callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+        llm=AzureChatOpenAI(deployment_name='chat', callback_manager=callback_manager, verbose=True)
+        
+        memory = ConversationSummaryMemory(llm=llm,memory_key="chat_history",return_messages=True)
+        qa = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, memory=memory)
     
-    st.title("Code Assistance")
-    conversation = create_llm()
- 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
- 
-    if prompt := st.chat_input("What is up?"):
-        st.chat_message("user").markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        response = conversation({"question": prompt})
-        with st.chat_message("assistant"):
-            st.markdown(response["text"])
-        st.session_state.messages.append({"role": "assistant", "content": response["text"]})
-        st.download_button('Download the code', response["text"])
+        query = st.text_input("Ask a question:")
+        if st.button("Get Answer"):
+            if query:
+                result = qa(query)
+                st.write(result['answer'])
