@@ -22,19 +22,19 @@ def clear_submit():
 embeddings = AzureOpenAIEmbeddings(azure_deployment='text-embedding-ada-002')
 
 callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-llm=AzureChatOpenAI(deployment_name='chat', callback_manager=callback_manager, verbose=True)
+llm = AzureChatOpenAI(deployment_name='chat', callback_manager=callback_manager, verbose=True)
 
 def create_chain(llm, prompt, CONDENSE_QUESTION_PROMPT, db):
     memory = ConversationTokenBufferMemory(llm=llm, memory_key="chat_history", return_messages=True, input_key='question',      
                                            output_key='answer')
-    chain = ConversationalRetrievalChain.from_llm(llm=llm,chain_type="stuff",retriever=db.as_retriever(search_kwargs={"k": 3}),
+    chain = ConversationalRetrievalChain.from_llm(llm=llm, chain_type="stuff", retriever=db.as_retriever(search_kwargs={"k": 3}),
                                                   return_source_documents=True, max_tokens_limit=256,
                                                   combine_docs_chain_kwargs={"prompt": prompt},
                                                   condense_question_prompt=CONDENSE_QUESTION_PROMPT, memory=memory,)
     return chain
 
 def set_custom_prompt_condense():
-    _template = """Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question, in its original language.
+    _template = """Given the following conversation and a follow-up question, rephrase the follow-up question to be a standalone question, in its original language.
     Chat History:
     {chat_history}
     Follow Up Input: {question}
@@ -53,38 +53,50 @@ def set_custom_prompt():
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     return prompt
 
+# Initialize or reset conversation history in session state
+def initialize_conversation_history():
+    return [{"role": "assistant", "content": "How can I help you?"}]
+
+if "messages" not in st.session_state or st.sidebar.button("Clear conversation history"):
+    st.session_state["messages"] = initialize_conversation_history()
+
 prompt = set_custom_prompt()
 CONDENSE_QUESTION_PROMPT = set_custom_prompt_condense()
 
-# load from disk
+# Load from disk
 db = Chroma(persist_directory="Botstabledata_db", embedding_function=embeddings)
-qa = create_chain(llm=llm, prompt=prompt,CONDENSE_QUESTION_PROMPT=CONDENSE_QUESTION_PROMPT, db=db)
-
+qa = create_chain(llm=llm, prompt=prompt, CONDENSE_QUESTION_PROMPT=CONDENSE_QUESTION_PROMPT, db=db)
 
 def run_qa_bot():
     st.title("Q&A ChatBot")
     
-    if "messages" not in st.session_state or st.sidebar.button("Clear conversation history"):
-        st.session_state["messages"] = [{"role": "assistant", "content":
-    "How can I help you?"}]
+    conversation_history = st.session_state["messages"]  # Access conversation history from session state
+    
+    if prompt := st.text_input("Please Type Your Query"):
+        query = prompt + " remember give me unique 3 bot names"
+        conversation_history.append({"role": "user", "content": prompt})  # Add user message to conversation history
         
-    if prompt := st.chat_input(placeholder="Please Type Your Query"):
-        query= prompt+" remember give me unique 3 bot names"
         st.chat_message("user").write(prompt)
         
         with st.chat_message("assistant"):
-                response = bot_response = qa({"question": query})
-                count = 1
-                for data in response["source_documents"]:
-                    dct={}
-                    bot_name=data.metadata['bot_name']
-                    bot_name=bot_name.replace(" ", "")
-                    bot_url=f"https://www.Botstore.com/botname={bot_name}"                
-                    dct["Description"]=data.page_content
-                    dct["BotName"]=data.metadata['bot_name']
-                    dct["BotURL"]=bot_url
-                    output=f"{count}) BotName : {data.metadata['bot_name']} \n\n Description : {data.page_content} \n\n BotURL : {bot_url}\n\n\n"
-                    st.write(output)
-                    count += 1
-                if len(bot_response["source_documents"]) == 0:
-                    st.write("No Result Found , Please Give Valid Description")
+            response = bot_response = qa({"question": query})
+            count = 1
+            for data in response["source_documents"]:
+                dct = {}
+                bot_name = data.metadata['bot_name']
+                bot_name = bot_name.replace(" ", "")
+                bot_url = f"https://www.Botstore.com/botname={bot_name}"                
+                dct["Description"] = data.page_content
+                dct["BotName"] = data.metadata['bot_name']
+                dct["BotURL"] = bot_url
+                output = f"{count}) BotName : {data.metadata['bot_name']} \n\n Description : {data.page_content} \n\n BotURL : {bot_url}\n\n\n"
+                st.write(output)
+                count += 1
+            if len(bot_response["source_documents"]) == 0:
+                st.write("No Result Found, Please Give Valid Description")
+    
+    # Update session state with modified conversation history
+    st.session_state["messages"] = conversation_history
+
+# Run the bot
+run_qa_bot()
