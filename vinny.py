@@ -1,48 +1,95 @@
 import streamlit as st
-from langchain.llms import AzureOpenAI
-from langchain.prompts import (
-    ChatPromptTemplate,
-    MessagesPlaceholder,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
-from langchain.chains import LLMChain
+import tempfile
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders.generic import GenericLoader
+from langchain.document_loaders.parsers import LanguageParser
+from langchain.embeddings import AzureOpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.callbacks.manager import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.chat_models import AzureChatOpenAI
-# LLM
-from langchain.memory import ConversationBufferMemory
- 
-@st.cache_resource
-def create_llm():
-    llm = AzureChatOpenAI(deployment_name='chat')
-    prompt = ChatPromptTemplate(
-        messages=[
-            SystemMessagePromptTemplate.from_template(
-                  """You are a briliant code assistant give only valid code.
-                  Please give code with import library and no output required.
-                  If you don't know the answer, just say that you don't know, don't try to make up an answer."""),
-            MessagesPlaceholder(variable_name="chat_history"),
-            HumanMessagePromptTemplate.from_template("{question}"),
-        ]
+from langchain.memory import ConversationSummaryMemory
+from langchain.chains import ConversationalRetrievalChain
+from langchain.text_splitter import Language
+from langchain.document_loaders import NotebookLoader, PythonLoader
+
+import os
+
+os.environ["OPENAI_API_TYPE"] = "azure"
+os.environ["OPENAI_API_VERSION"] = "2023-05-15"
+os.environ["OPENAI_API_KEY"] = "22c2ca1a04134562be1ab848aaba7d9c"
+os.environ["OPENAI_API_BASE"] = "https://coeaoai.openai.azure.com/"
+
+FILE_LOADER_MAPPING = {
+    "ipynb": (NotebookLoader, {}),
+    "py": (PythonLoader, {}),
+}
+
+def create_vector_database(documents):
+    python_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.PYTHON,
+                                                               chunk_size=2000,
+                                                               chunk_overlap=200)
+    texts = python_splitter.split_documents(documents)
+    embeddings = AzureOpenAIEmbeddings(azure_deployment='text-embedding-ada-002')
+    persist_directory = 'code_db'
+    # Create and persist a Chroma vector database from the chunked documents
+    db = Chroma.from_documents(
+        documents=texts,
+        embedding=embeddings,
+        #persist_directory=persist_directory
+        # persist_directory=DB_DIR,
     )
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    conversation = LLMChain(llm=llm, prompt=prompt, verbose=True, memory=memory)
-    return conversation
- 
-def run_code_bot():
-    st.title("Code Assistance")
-    conversation = create_llm()
- 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
- 
-    if prompt := st.chat_input("What is up?"):
-        st.chat_message("user").markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        response = conversation({"question": prompt})
-        with st.chat_message("assistant"):
-            st.markdown(response["text"])
-        st.session_state.messages.append({"role": "assistant", "content": response["text"]})
-        st.download_button('Download the code', response["text"])
+    #db.persist()
+
+    return db
+
+def run_code_rag():
+    st.title("Code Description")
+     # Upload files
+    uploaded_files = st.file_uploader("Upload your documents", type=[ "py", "ipynb"], accept_multiple_files=True)
+    loaded_documents = []
+
+    if uploaded_files:
+            # Create a temporary directory
+        with tempfile.TemporaryDirectory() as td:
+                # Move the uploaded files to the temporary directory and process them
+                for uploaded_file in uploaded_files:
+                    st.write(f"Uploaded: {uploaded_file.name}")
+                    ext = os.path.splitext(uploaded_file.name)[-1][1:].lower()
+                    st.write(f"Uploaded: {ext}")
+    
+                    # Check if the extension is in FILE_LOADER_MAPPING
+                    if ext in FILE_LOADER_MAPPING:
+                        loader_class, loader_args = FILE_LOADER_MAPPING[ext]
+                        # st.write(f"loader_class: {loader_class}")
+    
+                        # Save the uploaded file to the temporary directory
+                        file_path = os.path.join(td, uploaded_file.name)
+                        with open(file_path, 'wb') as temp_file:
+                            temp_file.write(uploaded_file.read())
+    
+                        # Use Langchain loader to process the file
+                        loader = GenericLoader.from_filesystem("/home/ubuntu/vinay/llm/test_rag",glob="*",suffixes=[".py", ".js"],
+                                     parser=LanguageParser(),)
+                        documents = loader.load()
+                        #loaded_documents.extend(loader.load())
+                    else:
+                        st.warning(f"Unsupported file extension: {ext}")
+                        
+        #persist_directory, embeddings = create_vector_database(documents)
+        db = create_vector_database(documents)
+        #db = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+        
+        retriever = db.as_retriever( search_type="mmr", search_kwargs={"k": 8})
+        
+        callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+        llm=AzureChatOpenAI(deployment_name='chat', callback_manager=callback_manager, verbose=True)
+        
+        memory = ConversationSummaryMemory(llm=llm,memory_key="chat_history",return_messages=True)
+        qa = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, memory=memory)
+    
+        query = st.text_input("Ask a question:")
+        if st.button("Get Answer"):
+            if query:
+                result = qa(query)
+                st.write(result['answer'])     
