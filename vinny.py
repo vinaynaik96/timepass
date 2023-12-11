@@ -1,28 +1,31 @@
 import os
-from fastapi import FastAPI
 import pandas as pd
+from fastapi import FastAPI
 
 app = FastAPI()
 
-def read_excel_from_directory(file_path):
-    if os.path.exists(file_path):
-        # Read the Excel file using pandas
-        df = pd.read_excel(file_path)
-        return df
+def search_value_by_keyword(csv_path, keyword):
+    if os.path.exists(csv_path):
+        # Read the CSV file using pandas
+        df = pd.read_csv(csv_path)
+        
+        # Search for the keyword in the 'Keyword' column
+        filtered_data = df[df['Keyword'] == keyword]
+        
+        if not filtered_data.empty:
+            # Get the value corresponding to the keyword
+            return filtered_data['Value'].iloc[0]
+        else:
+            return None
     else:
         return None
 
-@app.get("/read_excel/")
-async def read_excel():
-    directory = "your_directory_path_here"  # Specify your directory path here
-    file_name = "your_excel_file.xlsx"  # Specify your Excel file name
+@app.get("/search/")
+async def search_value(keyword: str):
+    csv_file_path = "path_to_your_csv_file/data.csv"  # Specify your CSV file path here
+    result = search_value_by_keyword(csv_file_path, keyword)
     
-    excel_file_path = os.path.join(directory, file_name)
-    data = read_excel_from_directory(excel_file_path)
-    
-    if data:
-        # Get column values
-        columns = data.columns.tolist()
-        return {"columns": columns, "data": data.to_dict(orient='records')}
+    if result is not None:
+        return {"keyword": keyword, "value": result}
     else:
-        return {"error": "File not found or unable to read."}
+        return {"error": "Keyword not found or file not found."}
