@@ -1,5 +1,11 @@
-[Document(page_content='Service Line: CIS\nSlno: 392\nBotNames: local admin rights for Desktop/laptop\nDescription: local admin rights for Desktop/laptop\nAccount Impl: RAC\nStatus: Deployed\nEffort savings: 0.4166666666666667\nTicketed/Non Ticketed: Ticketed\nCategory: Service Request\nSub category: Access Management\nTechnology: \nTool: MS SCORCH', metadata={'row': 5902, 'source': 'botstore.csv'}),
- Document(page_content='Service Line: CIS\nSlno: 392\nBotNames: local admin rights for Desktop/laptop\nDescription: local admin rights for Desktop/laptop\nAccount Impl: RAC\nStatus: Deployed\nEffort savings: 0.4166666666666667\nTicketed/Non Ticketed: Ticketed\nCategory: Service Request\nSub category: Access Management\nTechnology: \nTool: MS SCORCH', metadata={'row': 5902, 'source': 'botstore.csv'}),
- Document(page_content='Service Line: CIS\nSlno: 881\nBotNames: local admin rights for Desktop/laptop\nDescription: local admin rights for Desktop/laptop\nAccount Impl: Vorwerk\nStatus: Deployed\nEffort savings: 0.4166666666666667\nTicketed/Non Ticketed: \nCategory: Service Request\nSub category: Access Management\nTechnology: \nTool: MS SCORCH', metadata={'row': 6391, 'source': 'botstore.csv'}),
- Document(page_content='Service Line: CIS\nSlno: 881\nBotNames: local admin rights for Desktop/laptop\nDescription: local admin rights for Desktop/laptop\nAccount Impl: Vorwerk\nStatus: Deployed\nEffort savings: 0.4166666666666667\nTicketed/Non Ticketed: \nCategory: Service Request\nSub category: Access Management\nTechnology: \nTool: MS SCORCH', metadata={'row': 6391, 'source': 'botstore.csv'}),
- Document(page_content='Service Line: CIS\nSlno: 1433\nBotNames: myAccess - New hire/Internet\nDescription: myAccess - New hire/Internet\nAccount Impl: Kohler\nStatus: Deployed\nEffort savings: 0.05\nTicketed/Non Ticketed: \nCategory: Administration\nSub category: Access & Authorization\nTechnology: \nTool: CAC', metadata={'row': 6943, 'source': 'botstore.csv'})]
+from flask import Flask
+from PriceCheck import check_price
+
+app = Flask(__name__)
+
+@app.route('/search')
+def Response():
+    return check_price()
+
+if __name__ == '__main__':
+    app.run(host="0.0.0.0",port=5000,debug=True)
