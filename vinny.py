@@ -1,11 +1,4 @@
-from flask import Flask
-from PriceCheck import check_price
-
-app = Flask(__name__)
-
-@app.route('/search')
-def Response():
-    return check_price()
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0",port=5000,debug=True)
+	BotName	Overview	Description	Technology	Dev.Source	Category	Nature	AutomationTechnology	BotType	Domain	AvgRating	DownloadCount	Reusability	Benefits	ResuseablityPotential	IsAvailableinCognizantAutomationCenter	IsPackOnlyBot	ContactDL	ServiceCatalog	ProblemType
+0	3DES - Decrypt	Decrypts the encrypted text using 3DES algorithm.	The bot converts the encrypted text to plain t...	Linux	Python	Custom Apps	Non-intrusive	Standard Service Requests Fulfillment	Utility	All	5.0	29	60 - 80	NaN	Not Available	Yes	No	EITACustomAppsIBS@cognizant.com	NaN	Text Operations
+1	3DES - Encrypt	Encrypts the plain text using triple DES algor...	This bot converts a given plain text to encryp...	Linux	Python	Custom Apps	Non-intrusive	Standard Service Requests Fulfillment	Utility	All	5.0	7	60 - 80	NaN	NaN	Yes	No	EITACustomAppsIBS@cognizant.com	NaN	Text Operations
+2	8AddRevokeRemoteUser	The script reads the time slots from the confi...	The script reads the time slots from the confi...	Windows	PowerShell	Custom Apps	Non-intrusive	Standard Service Requests Fulfillment	Utility	All	0.0	5	60 - 80	NaN	NaN	Yes	No	EITACustomAppsIBS@cognizant.com	NaN	Modify Access Request
