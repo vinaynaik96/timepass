@@ -1,32 +1,24 @@
-import streamlit as st
-import tempfile
-import os
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
-# Existing code ...
+def list_to_pdf(strings, output_file):
+    pdf = canvas.Canvas(output_file, pagesize=letter)
+    y_coordinate = 750  # Starting y-coordinate for text
 
-if prompt := st.chat_input("What is up?"):
-    st.chat_message("user").markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    response = conversation({"question": prompt})
-    with st.chat_message("assistant"):
-        st.markdown(response["text"])
-    st.session_state.messages.append({"role": "assistant", "content": response["text"]})
+    for string in strings:
+        pdf.drawString(100, y_coordinate, string)
+        y_coordinate -= 20  # Move to the next line
 
-    # Creating a temporary file to store Python code
-    temp_filename = tempfile.NamedTemporaryFile(suffix=".py", delete=False).name
-    with open(temp_filename, "w") as temp_file:
-        temp_file.write(response["text"])  # Writing the code content to the temp file
+    pdf.save()
 
-    # Provide the download button with the file content
-    with open(temp_filename, "r") as file:
-        code_content = file.read()
-        st.download_button(
-            label='Download .py File',
-            data=code_content.encode(),
-            file_name='generated_code.py',
-            mime='text/plain'
-        )
+# Example list of strings
+my_strings = [
+    "Hello,",
+    "This is a sample text.",
+    "Creating a PDF from a list of strings.",
+    "Regards,",
+    "Me"
+]
 
-    os.remove(temp_filename)  # Clean up: Remove the temporary file
-
-    st.success("Code downloaded successfully!")
+# Convert the list of strings to a PDF file
+list_to_pdf(my_strings, "output.pdf")
