@@ -1,4 +1,24 @@
-	BotName	Overview	Description	Technology	Dev.Source	Category	Nature	AutomationTechnology	BotType	Domain	AvgRating	DownloadCount	Reusability	Benefits	ResuseablityPotential	IsAvailableinCognizantAutomationCenter	IsPackOnlyBot	ContactDL	ServiceCatalog	ProblemType
-0	3DES - Decrypt	Decrypts the encrypted text using 3DES algorithm.	The bot converts the encrypted text to plain t...	Linux	Python	Custom Apps	Non-intrusive	Standard Service Requests Fulfillment	Utility	All	5.0	29	60 - 80	NaN	Not Available	Yes	No	EITACustomAppsIBS@cognizant.com	NaN	Text Operations
-1	3DES - Encrypt	Encrypts the plain text using triple DES algor...	This bot converts a given plain text to encryp...	Linux	Python	Custom Apps	Non-intrusive	Standard Service Requests Fulfillment	Utility	All	5.0	7	60 - 80	NaN	NaN	Yes	No	EITACustomAppsIBS@cognizant.com	NaN	Text Operations
-2	8AddRevokeRemoteUser	The script reads the time slots from the confi...	The script reads the time slots from the confi...	Windows	PowerShell	Custom Apps	Non-intrusive	Standard Service Requests Fulfillment	Utility	All	0.0	5	60 - 80	NaN	NaN	Yes	No	EITACustomAppsIBS@cognizant.com	NaN	Modify Access Request
+def create_prompt_template():
+    prompt_template = """
+    Analyze the SQL explain statement provided below, considering the given context and conditions:
+
+    **Table Information:**
+    - Rows: {rows}
+    - Schema:
+      {context_conditions}
+
+    **Query Details:**
+    I am running the following query with its explain statement:
+
+    **SQL Explain Statement:**
+    {explain_statement} 
+
+    **Analysis Result:**
+    Provide the output in JSON format with the following structure:
+    {
+        "Result": "Accepted or Rejected",
+        "Reason": "Detailed reason to accept or reject. If rejected, include all possible reasons such as query_cost, filtering, use of joins, etc.",
+        "Suggestions": "Suggestions on how to improve the query, if applicable."
+    }
+    """
+    return prompt_template
