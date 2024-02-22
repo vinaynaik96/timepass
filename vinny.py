@@ -4,20 +4,29 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
-
 prompt_template = """
-    Analyze the following SQL explain statement, considering the provided context and conditions: 
-    The table consists {rows} rows and the schema of the table is described below: 
-    **Schema:** 
-    {context_conditions} 
-    I want to run a query whose explain statement I have generated and is described below as: 
-    **SQL Explain Statement:** 
-    {explain_statement} 
-    
-    **Based on your analysis, should the SQL query be accepted or rejected? Return the output strictly in json format in key-value type like Result: 
-    Accepted or Rejected; Reason: Detailed reason to accept or reject - If rejected include all possible reasons to reject the query.
-    e.g. query_cost, filtering, use of joins or anything which is applicable; Suggestions :how to improve the query; ** 
-    """
+    Analyze the following SQL explain statement based on the provided context and conditions:
+
+    **Table Information:**
+    - Table has {rows} rows.
+    - **Schema:**
+        {context_conditions}
+
+    **SQL Query:**
+    ```sql
+    {sql_query}
+    ```
+
+    **Explain Statement:**
+    ```json
+    {explain_statement}
+    ```
+
+    **Analysis Result:**
+    - **Acceptance:** {acceptance_status}
+    - **Reason:** {reason}
+    - **Suggestions:** {suggestions}
+"""
 
 data_input = {
     'explain_plan': {
@@ -68,7 +77,13 @@ sql_analysis_chain = LLMChain(llm=llm, prompt=sql_analysis_prompt)
 
 if __name__ == "__main__":
     # Generate SQL analysis response
-    sql_analysis_resp = sql_analysis_chain.run(rows=row_count, context_conditions=schema, explain_statement=explain_plan)
-
-    # Print the JSON-formatted response
-    print(json.dumps(sql_analysis_resp, indent=2))
+    sql_analysis_resp = sql_analysis_chain.run(
+        rows=row_count,
+        context_conditions=schema,
+        explain_statement=explain_plan,
+        sql_query=sql_query,
+        acceptance_status="Accepted",  # Set based on your analysis result
+        reason="The query is efficient and well-optimized.",  # Set based on your analysis result
+        suggestions="No specific suggestions at the moment."  # Set based on your analysis result
+    )
+    print(json.dumps(sql_analysis_resp, indent=4))
